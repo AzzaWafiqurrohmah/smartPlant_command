@@ -45,6 +45,7 @@ class FirebaseService
                     $onUpdate = $this->checkNotif($item, $deviceName);
                     if($onUpdate == 0){
                         $this->notifyUpdate(true, $deviceName);
+                        $this->conditionUpdate($deviceName, 'Aku Sehat');
                     }
                 }
             }
