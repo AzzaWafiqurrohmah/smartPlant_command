@@ -60,37 +60,73 @@ class FirebaseService
         return $remaining;
     }
 
-    public function checkNotif($data, $deviceName){
+    public function checkNotif($data, $deviceName)
+    {
+        $conditions = [
+            [
+                'key' => 'temperature',
+                'min' => 25,
+                'max' => 33,
+                'minMessage' => 'Suhu terlalu dingin!',
+                'maxMessage' => 'Suhu terlalu panas!',
+            ],
+            [
+                'key' => 'humidity',
+                'min' => 50,
+                'max' => 80,
+                'minMessage' => 'Tanamanmu kurang air!',
+                'maxMessage' => 'Tanamanmu kelebihan air!',
+            ],
+            [
+                'key' => 'intensity',
+                'min' => 1156,
+                'max' => 1818,
+                'minMessage' => 'Tempat ini terlalu redup!',
+                'maxMessage' => 'Tempat ini terlalu terang!',
+            ],
+        ];
+
         $onUpdate = 0;
-        $min_tmpt = 30;
-        $min_hum = 30;
-        $min_intens = 24;
-        
-        $now_tmpt = $data['temperature'];
-        $now_hum = $data['humidity'];
-        $now_intens = $data['intensity'];
-        $name = $data['name'];
 
-        if($now_tmpt >= $min_tmpt){
-            $onUpdate = 1;
-            $this->sendNotif($name, 'Suhu terlalu panas', $deviceName);
-            $this->conditionUpdate($deviceName, 'Suhu terlalu panas');
+        foreach ($conditions as $condition) {
+            $nowVal = $data[$condition['key']];
+            $onUpdate += $this->evaluateCondition(
+                $data['name'],
+                $deviceName,
+                $nowVal,
+                $condition['min'],
+                $condition['max'],
+                $condition['minMessage'],
+                $condition['maxMessage']
+            );
         }
 
-        if($now_hum <= $min_hum){
-            $onUpdate = 1;
-            $this->sendNotif($name, 'Tanaman kurang air', $deviceName);
-            $this->conditionUpdate($deviceName, 'Perlu disiram');
-        }
-
-        if($now_intens <= $min_intens){
-            $onUpdate = 1;
-            $this->sendNotif($name, 'Aku kurang cahaya matahari', $deviceName);
-            $this->conditionUpdate($deviceName, 'Kekurangan cahaya matahari');
-        }
-
-        return $onUpdate;
+        return $onUpdate > 0 ? 1 : 0;
     }
+
+    private function evaluateCondition($name, $deviceName, $nowVal, $minVal, $maxVal, $minMessage, $maxMessage)
+    {
+        $updated = 0;
+
+        if ($nowVal < $minVal) {
+            $this->handleAlert($name, $deviceName, $minMessage);
+            $updated = 1;
+        }
+
+        if ($nowVal > $maxVal) {
+            $this->handleAlert($name, $deviceName, $maxMessage);
+            $updated = 1;
+        }
+
+        return $updated;
+    }
+
+    private function handleAlert($name, $deviceName, $message)
+    {
+        $this->sendNotif($name, $message, $deviceName);
+        $this->conditionUpdate($deviceName, $message);
+    }
+
 
     public function sendNotif($name, $messageWords, $deviceName){
         $messaging = $this->factory->createMessaging();
@@ -106,7 +142,7 @@ class FirebaseService
         } catch (MessagingException $e) {
             echo $e->getMessage();
         }
-
+        
         $this->notifyUpdate(false, $deviceName);
     }
 
@@ -117,7 +153,6 @@ class FirebaseService
         if($notified){
             $notifyTime = 0;
         }
-
         $reference = $this->database->getReference('iot' . '/' . $deviceName);
         $reference->update(['notified' => $notifyTime]);
     }
